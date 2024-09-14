@@ -1,16 +1,16 @@
 const express = require('express');
-const { Pool } = require('pg'); // Use pg module for PostgreSQL
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const session = require('express-session');
-const app = express();
-const port = process.env.PORT || 3000;
+const session = require('express-session'); // Added express-session
 
-// Middleware setup
+const app = express();
+const port = process.env.PORT || 3000; // Use dynamic port for Heroku or fallback for local dev
+
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Session setup
+// Set up sessions
 app.use(session({
     secret: 'yourSecretKey', // Replace with a strong secret
     resave: false,
@@ -18,41 +18,28 @@ app.use(session({
     cookie: { secure: false } // Set to true if using HTTPS in production
 }));
 
-// PostgreSQL Pool setup
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
-
-// Ensure users table exists
-pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
-    );
-`, (err) => {
+// Database connection
+let db = new sqlite3.Database('./mydatabase.db', (err) => {
     if (err) {
-        console.error('Error creating users table:', err);
+        console.error(err.message);
     } else {
-        console.log('Users table is ready.');
+        console.log('Connected to the SQLite database.');
     }
 });
 
-// Ensure notes table exists
-pool.query(`
-    CREATE TABLE IF NOT EXISTS notes (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        note TEXT
-    );
-`, (err) => {
-    if (err) {
-        console.error('Error creating notes table:', err);
-    } else {
-        console.log('Notes table is ready.');
-    }
-});
+// Ensure users and notes tables exist
+db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    password TEXT
+)`);
+
+db.run(`CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    note TEXT,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+)`);
 
 // Root route (login page)
 app.get('/', (req, res) => {
@@ -62,12 +49,12 @@ app.get('/', (req, res) => {
 // Login route
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    pool.query(`SELECT * FROM users WHERE username = $1 AND password = $2`, [username, password], (err, result) => {
+    db.get(`SELECT * FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
         if (err) {
             return res.render('index', { loggedInUser: null, error: 'An error occurred during login' });
         }
-        if (result.rows.length > 0) {
-            req.session.userId = result.rows[0].id;
+        if (row) {
+            req.session.userId = row.id; // Store user ID in session
             res.redirect('/notes');
         } else {
             res.render('index', { loggedInUser: null, error: 'Invalid username or password' });
@@ -78,25 +65,25 @@ app.post('/login', (req, res) => {
 // Signup route
 app.post('/signup', (req, res) => {
     const { username, password } = req.body;
-    pool.query(`INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id`, [username, password], (err, result) => {
+    db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [username, password], function (err) {
         if (err) {
             return res.render('index', { loggedInUser: null, error: 'An error occurred during signup' });
         }
-        req.session.userId = result.rows[0].id;
+        req.session.userId = this.lastID; // Store new user ID in session
         res.redirect('/notes');
     });
 });
 
-// Notes page - show notes for logged-in user only
+// Notes page - show notes for logged in user only
 app.get('/notes', (req, res) => {
     if (!req.session.userId) {
         return res.redirect('/');
     }
-    pool.query(`SELECT * FROM notes WHERE user_id = $1`, [req.session.userId], (err, result) => {
+    db.all(`SELECT * FROM notes WHERE user_id = ?`, [req.session.userId], (err, rows) => {
         if (err) {
             return res.send('Error fetching notes!');
         }
-        res.render('notes', { notes: result.rows });
+        res.render('notes', { notes: rows });
     });
 });
 
@@ -106,7 +93,7 @@ app.post('/add-note', (req, res) => {
         return res.redirect('/');
     }
     const { note } = req.body;
-    pool.query(`INSERT INTO notes (user_id, note) VALUES ($1, $2)`, [req.session.userId, note], (err) => {
+    db.run(`INSERT INTO notes (user_id, note) VALUES (?, ?)`, [req.session.userId, note], (err) => {
         if (err) {
             return res.send('Error adding the note!');
         }
@@ -114,17 +101,17 @@ app.post('/add-note', (req, res) => {
     });
 });
 
-// Edit note
+// Edit note - user can only edit their own notes
 app.get('/edit-note/:id', (req, res) => {
     if (!req.session.userId) {
         return res.redirect('/');
     }
     const noteId = req.params.id;
-    pool.query(`SELECT * FROM notes WHERE id = $1 AND user_id = $2`, [noteId, req.session.userId], (err, result) => {
-        if (err || result.rows.length === 0) {
+    db.get(`SELECT * FROM notes WHERE id = ? AND user_id = ?`, [noteId, req.session.userId], (err, row) => {
+        if (err || !row) {
             return res.send('Note not found or unauthorized!');
         }
-        res.render('edit-note', { note: result.rows[0] });
+        res.render('edit-note', { note: row });
     });
 });
 
@@ -135,7 +122,7 @@ app.post('/edit-note/:id', (req, res) => {
     }
     const noteId = req.params.id;
     const { note } = req.body;
-    pool.query(`UPDATE notes SET note = $1 WHERE id = $2 AND user_id = $3`, [note, noteId, req.session.userId], (err) => {
+    db.run(`UPDATE notes SET note = ? WHERE id = ? AND user_id = ?`, [note, noteId, req.session.userId], (err) => {
         if (err) {
             return res.send('Error updating note!');
         }
@@ -143,13 +130,13 @@ app.post('/edit-note/:id', (req, res) => {
     });
 });
 
-// Delete note
+// Delete note - user can only delete their own notes
 app.get('/delete-note/:id', (req, res) => {
     if (!req.session.userId) {
         return res.redirect('/');
     }
     const noteId = req.params.id;
-    pool.query(`DELETE FROM notes WHERE id = $1 AND user_id = $2`, [noteId, req.session.userId], (err) => {
+    db.run(`DELETE FROM notes WHERE id = ? AND user_id = ?`, [noteId, req.session.userId], (err) => {
         if (err) {
             return res.send('Error deleting the note!');
         }
@@ -157,24 +144,24 @@ app.get('/delete-note/:id', (req, res) => {
     });
 });
 
-// Account settings
+// Account settings - only available for logged in users
 app.get('/account-settings', (req, res) => {
     if (!req.session.userId) {
         return res.redirect('/');
     }
-    pool.query(`SELECT * FROM users WHERE id = $1`, [req.session.userId], (err, result) => {
+    db.get(`SELECT * FROM users WHERE id = ?`, [req.session.userId], (err, row) => {
         if (err) {
             return res.send('Error fetching account settings!');
         }
-        res.render('account-settings', { user: result.rows[0] });
+        res.render('account-settings', { user: row });
     });
 });
 
 // Change username
 app.post('/change-username', (req, res) => {
     const { newUsername } = req.body;
-    const userId = req.session.userId;
-    pool.query(`UPDATE users SET username = $1 WHERE id = $2`, [newUsername, userId], (err) => {
+    const user_id = req.session.userId;
+    db.run(`UPDATE users SET username = ? WHERE id = ?`, [newUsername, user_id], (err) => {
         if (err) {
             return res.send('Error changing username!');
         }
@@ -185,8 +172,8 @@ app.post('/change-username', (req, res) => {
 // Change password
 app.post('/change-password', (req, res) => {
     const { newPassword } = req.body;
-    const userId = req.session.userId;
-    pool.query(`UPDATE users SET password = $1 WHERE id = $2`, [newPassword, userId], (err) => {
+    const user_id = req.session.userId;
+    db.run(`UPDATE users SET password = ? WHERE id = ?`, [newPassword, user_id], (err) => {
         if (err) {
             return res.send('Error changing password!');
         }
@@ -194,15 +181,20 @@ app.post('/change-password', (req, res) => {
     });
 });
 
-// Delete account
+// Delete account - removes the user and all their notes
 app.post('/delete-account', (req, res) => {
-    const userId = req.session.userId;
-    pool.query(`DELETE FROM users WHERE id = $1`, [userId], (err) => {
+    const user_id = req.session.userId;
+    db.run(`DELETE FROM notes WHERE user_id = ?`, [user_id], (err) => {
         if (err) {
-            return res.send('Error deleting account!');
+            return res.send('Error deleting notes!');
         }
-        req.session.destroy();
-        res.redirect('/');
+        db.run(`DELETE FROM users WHERE id = ?`, [user_id], (err) => {
+            if (err) {
+                return res.send('Error deleting account!');
+            }
+            req.session.destroy();
+            res.redirect('/');
+        });
     });
 });
 
