@@ -1,14 +1,10 @@
 {
   "name": "basic-note-app-sql",
   "version": "1.0.0",
-  "main": "app.js",  // Ensure this points to your main file
+  "main": "app.js",
   "scripts": {
-    "start": "node app.js"  // This tells Heroku how to run your app
+    "start": "node app.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "csv-writer": "^1.6.0",
     "ejs": "^3.1.10",
