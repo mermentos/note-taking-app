@@ -16,7 +16,7 @@ app.use(session({
     secret: 'yourSecretKey', // Replace with a strong secret
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } 
+    cookie: { secure: false }
 }));
 
 // SQLite database connection
