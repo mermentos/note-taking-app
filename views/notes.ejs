@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Notes - NoteMaster</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script>
+        function openModal(noteId) {
+            document.getElementById('modal-' + noteId).style.display = 'block';
+        }
+
+        function closeModal(noteId) {
+            document.getElementById('modal-' + noteId).style.display = 'none';
+        }
+
+        function openAddNoteModal() {
+            document.getElementById('add-note-modal').style.display = 'block';
+        }
+
+        function closeAddNoteModal() {
+            document.getElementById('add-note-modal').style.display = 'none';
+        }
+
+        function searchNotes() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const notes = document.getElementsByClassName('note-card');
+            let hasResults = false;
+            
+            for (let note of notes) {
+                const content = note.getElementsByTagName('p')[0].innerText.toLowerCase();
+                if (content.includes(searchTerm)) {
+                    note.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    note.style.display = 'none';
+                }
+            }
+
+            document.getElementById('clear-filter').style.display = hasResults ? 'block' : 'none';
+        }
+
+        function clearFilter() {
+            document.getElementById('search-input').value = '';
+            const notes = document.getElementsByClassName('note-card');
+            for (let note of notes) {
+                note.style.display = 'block';
+            }
+            document.getElementById('clear-filter').style.display = 'none';
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>My Notes</h1>
+            <div class="user-info">
+                <span class="username">Hi, <%= username %></span>
+                <nav class="nav-links">
+                    <a href="/account-settings">Account Settings</a>
+                    <a href="/logout">Logout</a>
+                </nav>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search notes...">
+            <button onclick="searchNotes()">Search</button>
+        </div>
+
+        <div id="clear-filter" class="clear-filter">
+            <button onclick="clearFilter()">Clear filter</button>
+        </div>
+
+        <% if (notes.length === 0) { %>
+            <div class="welcome-message">
+                <h2>Welcome to NoteMaster!</h2>
+                <p>You don't have any notes yet. Click the '+' button to add your first note. NoteMaster is perfect for jotting down quick thoughts, creating to-do lists, saving meeting minutes, or capturing ideas for your next big project. Start organizing your thoughts today!</p>
+            </div>
+        <% } else { %>
+            <div class="note-grid">
+                <% notes.forEach(note => { %>
+                    <div class="note-card">
+                        <div class="note-header">
+                            <div class="note-actions">
+                                <a href="#" onclick="openModal('<%= note.id %>')">View</a>
+                                <a href="/edit-note/<%= note.id %>">Edit</a>
+                                <a href="/delete-note/<%= note.id %>" onclick="return confirm('Are you sure you want to delete this note?')">Delete</a>
+                            </div>
+                        </div>
+                        <p><%= note.note.substring(0, 100) %>...</p>
+                    </div>
+
+                    <div id="modal-<%= note.id %>" class="modal">
+                        <div class="modal-content">
+                            <span class="close" onclick="closeModal('<%= note.id %>')">&times;</span>
+                            <h2>Note Details</h2>
+                            <p><%= note.note %></p>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
+
+        <button class="add-note" onclick="openAddNoteModal()">+</button>
+
+        <div id="add-note-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeAddNoteModal()">&times;</span>
+                <h2>Add New Note</h2>
+                <form action="/add-note" method="POST">
+                    <textarea name="note" placeholder="Enter your note" required></textarea>
+                    <button type="submit">Save Note</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

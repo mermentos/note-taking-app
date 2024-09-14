@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Account Settings</h1>
+
+        <h2>Change Username</h2>
+        <form action="/change-username" method="POST">
+            <input type="text" name="newUsername" placeholder="New Username" required>
+            <button type="submit">Change Username</button>
+        </form>
+
+        <h2>Change Password</h2>
+        <form action="/change-password" method="POST">
+            <input type="password" name="newPassword" placeholder="New Password" required>
+            <button type="submit">Change Password</button>
+        </form>
+
+        <h2>Delete Account</h2>
+        <form action="/delete-account" method="POST" onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone.')">
+            <button type="submit" class="danger">Delete Account</button>
+        </form>
+
+        <a href="/notes">Back to Notes</a>
+    </div>
+</body>
+</html>
