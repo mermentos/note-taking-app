@@ -1,7 +1,7 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const session = require('express-session'); // Added express-session
+const session = require('express-session');
 
 const app = express();
 const port = process.env.PORT || 3000; // Use dynamic port for Heroku or fallback for local dev
@@ -19,9 +19,10 @@ app.use(session({
 }));
 
 // Database connection
-let db = new sqlite3.Database('./mydatabase.db', (err) => {
+// Use '/tmp/mydatabase.db' for Heroku's ephemeral file system, otherwise use './mydatabase.db' for local
+let db = new sqlite3.Database(process.env.NODE_ENV === 'production' ? '/tmp/mydatabase.db' : './mydatabase.db', (err) => {
     if (err) {
-        console.error(err.message);
+        console.error('Error connecting to SQLite:', err.message);
     } else {
         console.log('Connected to the SQLite database.');
     }
