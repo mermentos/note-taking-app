@@ -2,7 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;  // Use Heroku's PORT or fallback to 3000 for local development
 
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
