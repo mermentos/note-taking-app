@@ -1,15 +1,19 @@
 {
   "name": "basic-note-app-sql",
   "version": "1.0.0",
+  "description": "",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
-  "express-session": "^1.17.1",
-  "csv-writer": "^1.6.0",
-  "ejs": "^3.1.10",
-  "express": "^4.21.0",
-  "sqlite3": "^5.1.7"
-}
+    "express": "^4.21.0",
+    "pg": "^8.7.1",
+    "ejs": "^3.1.10",
+    "express-session": "^1.18.0"
+  },
+  "engines": {
+    "node": "16.x",
+    "npm": "8.x"
+  }
 }
